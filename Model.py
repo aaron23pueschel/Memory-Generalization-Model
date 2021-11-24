@@ -42,7 +42,7 @@ class Sensory_Layer:
         def f_ij(self,phi,theta):
             return np.exp((1/self.omega)*np.cos(phi-theta)-1)
 
-    def generate_output(self,input_vec,plot = False,set_normalized_matrix = False):
+    def generate_output(self,input_vec,plot = False,set_normalized_matrix = False,normalize = True):
         ## input vector must be of the length of the number of neurons
         ## input can be zeros and ones, but in bays, equation 2, there is a scaling factor alpha associated
         ## with each input. You can provide a vector of any integers and the output will be scaled accordingly
@@ -54,6 +54,8 @@ class Sensory_Layer:
         f_ij_matrix = []
         for i in range(0,self.number_of_neurons):
             f_ij_matrix.append(self.Neurons[i].tuning_curve(input_vec))
+        if not normalize:
+            return f_ij_matrix
         normalized_matrix = []
         for rows in range(0,len(f_ij_matrix)):
             normalized_matrix.append(f_ij_matrix[rows]/np.sum(f_ij_matrix[rows]))
@@ -69,7 +71,7 @@ class Sensory_Layer:
         ## Im pretty sure that n_ij has to be supplied by the user. Since n_ij is obviously an element 
         ## from a matrix (the firing predicted rate of neuron i in response to input j) it follows that the user
         ## must supply an INTEGER matrix of predicted firing rates. 
-        
+
         spiking_probabilities = np.ones((self.number_of_neurons,self.number_of_neurons))
         for i in range(0,self.number_of_neurons):
             for j in range(0,self.number_of_neurons):
