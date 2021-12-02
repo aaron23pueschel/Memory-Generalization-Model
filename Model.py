@@ -2,8 +2,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
+from scipy.sparse import random
 
 
+def generate_input_vector(vector_length,density):
+        rand = (random(1,vector_length,density= density).A)[0]
+        ones = [int(np.ceil(x)) for x in rand]
+        return ones
 
 class Sensory_Layer:
     def __init__(self,number_of_neurons=100,omega=1):
@@ -13,7 +18,7 @@ class Sensory_Layer:
         self.omega = omega
         self.initialize_neurons()
 
-    ## Nueron class models a single neuron in the sensory layer. Note that neuron tuning curves dont really make
+    ## Nueron class models a single neuron in the sensory layer. Note that neural responses dont really make
     ## sense outside of the context of the sensory layer, so keep that in mind if you decide to 
     ## instantiate a neuron without a sensory layer
     class Neuron:
@@ -23,7 +28,7 @@ class Sensory_Layer:
                 self.index = index
                 self.number_of_neurons_in_layer = number_of_neurons_in_layer
 
-            def tuning_curve(self,input):
+            def neural_response(self,input):
                 ## I am going to assume that phi will be determined by a neurons index with respect to the total
                 ## number of neurons in a layer. 
                 phi = (self.index*2*np.pi)/self.number_of_neurons_in_layer
@@ -36,7 +41,8 @@ class Sensory_Layer:
                     output_vec[input_index] = input[input_index]*self.f_ij(phi,theta)
                 return output_vec
 
-            def f_ij(self,phi,theta):
+            def f_ij(self,phi,theta): # Eq 1 in Bays. This gives the response of a neuron to input theta, 
+                                      # for any value of theta. Each neuron has a preferred orientation phi.
                 return np.exp((1/self.omega)*np.cos(phi-theta)-1)
 
     def initialize_neurons(self):
@@ -48,8 +54,14 @@ class Sensory_Layer:
         for i in range(0,int(self.number_of_neurons)):
             self.Neurons.append(self.Neuron(index=i,number_of_neurons_in_layer=self.number_of_neurons))
 
+    def population_response(self,response_matrix = None):
+        transposed = np.transpose(response_matrix)
+        population_response = np.sum(transposed, axis = 0)
+        return population_response
+       
 
-    def generate_output(self,input_vec,plot = False,set_normalized_matrix = False,normalize = True):
+
+    def generate_output(self,input_vec,plot = False,set_normalized_matrix = False,normalize = True,gain_gamma = 1):
         ## input vector must be of the length of the number of neurons
         ## input can be zeros and ones, but in bays, equation 2, there is a scaling factor alpha associated
         ## with each input. You can provide a vector of any real numbers and the output will be scaled accordingly
@@ -59,37 +71,44 @@ class Sensory_Layer:
             print("number of neurons: "+ str(self.number_of_neurons))
             return 0
 
-        ## This is calculating equation 2 in bays
         f_ij_matrix = []
         for i in range(0,self.number_of_neurons):
-            f_ij_matrix.append(self.Neurons[i].tuning_curve(input_vec))
+            f_ij_matrix.append(self.Neurons[i].neural_response(input_vec))
     
         ## This is an option to return and plot before normalization
         ## set normalize flag to False if you choose this option
         if not normalize:
             if plot:
-                plt.imshow(f_ij_matrix)
+                c = plt.imshow(f_ij_matrix)
+                plt.colorbar(c)
                 plt.title("Not normalized output matrix")
                 plt.show()
             return f_ij_matrix
             
         ## Normalize == True here 
-        normalized_matrix = []
-        for rows in range(0,len(f_ij_matrix)):
-            normalized_matrix.append(f_ij_matrix[rows]/np.sum(f_ij_matrix[rows]))
+        denominator = np.sum(f_ij_matrix)
+        if denominator==0:
+            print("Input non-existent")
+            return 0
+        normalized_matrix = (gain_gamma/denominator)*np.array(f_ij_matrix)
+            
         
         ## This is a flag to set the normalized matrix of a layer 
         ## Basically, it sets the output of a layer in response to a certain input.
         ## To change this, just run new input through this function and set the set_normalized_matrix to true
         if set_normalized_matrix:
-            self.normalized_matrix = normalized_matrix
+            self.normalized_matrix = np.transpose(normalized_matrix)
 
 
         if plot:
-            plt.imshow(normalized_matrix)
+            c = plt.imshow(normalized_matrix)
             plt.title("Normalized output matrix")
+            plt.colorbar(c)
             plt.show()
-        return normalized_matrix
+        return np.array(normalized_matrix)
+
+    
+
     def return_spiking_distribution(self,n_ij_matrix,T=100,plot=False):
         ## This is equation 4 in bays.
         ## Im pretty sure that n_ij has to be supplied by the user. Since n_ij is an element 
